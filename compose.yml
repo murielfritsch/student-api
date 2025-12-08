@@ -6,11 +6,18 @@ services:
     environment:
       POSTGRES_DB: studentdb
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: somepostgrespass
+      POSTGRES_PASSWORD: /run/secrets/postgresql-password
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    secrets:
+      - postgresql-password
+secrets:
+  # either file or environment - https://docs.docker.com/compose/how-tos/use-secrets/
+  # grants the container access to the secret and mounts it as read-only to /run/secrets/<secret_name> within the container
+  postgresql-password:
+    file: docker_secrets.yml
 
 volumes:
   postgres_data:
