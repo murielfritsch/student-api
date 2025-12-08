@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: studentapi_db_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: studentdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: /run/secrets/postgresql-password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    secrets:
+      - postgresql-password
+secrets:
+  postgresql-password:
+    file: docker_secrets.yml
+
+volumes:
+  postgres_data:
