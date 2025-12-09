@@ -1,6 +1,9 @@
 package com.example.studentapi.service;
 
+import com.example.studentapi.dto.StudentRequestDto;
+import com.example.studentapi.dto.StudentResponseDto;
 import com.example.studentapi.entity.Student;
+import com.example.studentapi.mapper.StudentMapper;
 import com.example.studentapi.repository.StudentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,70 +26,80 @@ class StudentServiceTest {
     @Mock
     private StudentRepository studentRepository;
 
+    @Mock
+    private StudentMapper mapper;
+
     @InjectMocks
     private StudentService studentService;
 
     private Student testStudent;
+    private StudentRequestDto studentRequestDto;
+    private StudentResponseDto studentResponseDto;
+    private final Long TEST_STUDENT_ID = 1L;
+    private final int TEST_STUDENT_AGE = 25;
 
     @BeforeEach
     void setUp() {
-        testStudent = new Student("FirstName", "LastName", "testStudent@example.com", 20);
+        testStudent = new Student("FirstName", "LastName", "test@example.com", TEST_STUDENT_AGE);
+        studentRequestDto = new StudentRequestDto(
+                "FirstName", "LastName", "test@example.com", TEST_STUDENT_AGE
+        );
+
+        studentResponseDto = new StudentResponseDto(
+                TEST_STUDENT_ID, "FirstName", "LastName", "test@example.com", 20
+        );
     }
 
     @Test
     void shouldCallFindAllStudents() {
         // Arrange
-        Student student2 = new Student();
-        student2.setEmail("test2@example.com");
-        List<Student> allStudents = new ArrayList<>();
-        allStudents.add(testStudent);
-        allStudents.add(student2);
-
+        List<Student> allStudents = List.of(testStudent);
         when(studentRepository.findAll()).thenReturn(allStudents);
+        when(mapper.toResponse(testStudent)).thenReturn(studentResponseDto);
 
         // Act
-        List<Student> result = studentService.getAllStudents();
+        List<StudentResponseDto> allStudentsResult = studentService.getAllStudents();
 
         // Assert
-        assertNotNull(result);
+        assertNotNull(allStudentsResult);
+        assertEquals(1, allStudentsResult.size());
         verify(studentRepository).findAll();
+        verify(mapper).toResponse(testStudent);
     }
 
     @Test
     void givenId_shouldCallFindByIdAndReturnOneStudent() {
         // Arrange
-        Long id = 1L;
-        when(studentRepository.findById(id)).thenReturn(Optional.of(testStudent));
+        when(studentRepository.findById(TEST_STUDENT_ID)).thenReturn(Optional.of(testStudent));
+        when(mapper.toResponse(testStudent)).thenReturn(studentResponseDto);
 
         // Act
-        Student studentResult = studentService.getStudent(id);
+        StudentResponseDto studentDtoResult = studentService.getStudent(TEST_STUDENT_ID);
 
         // Assert
-        assertNotNull(studentResult);
-        assertEquals(testStudent.getFirstName(), studentResult.getFirstName());
-        verify(studentRepository).findById(id);
+        assertNotNull(studentDtoResult);
+        assertEquals(testStudent.getFirstName(), studentDtoResult.firstName());
+        verify(studentRepository).findById(TEST_STUDENT_ID);
     }
 
     @Test
     void shouldThrow_whenStudentNotFound() {
         // Arrange
-        Long id= 1L;
-        when(studentRepository.findById(id)).thenReturn(Optional.empty());
+        when(studentRepository.findById(TEST_STUDENT_ID)).thenReturn(Optional.empty());
 
         // Act
         // Assert
-        assertThrows(RuntimeException.class, () -> studentService.getStudent(id));
-        verify(studentRepository).findById(id);
+        assertThrows(RuntimeException.class, () -> studentService.getStudent(TEST_STUDENT_ID));
+        verify(studentRepository).findById(TEST_STUDENT_ID);
     }
 
     @Test
     void givenNoStudents_whenGetAllStudents_shouldReturnEmptyList() {
         // Arrange
-        List<Student> allStudentsEmpty = new ArrayList<>();
-        when(studentRepository.findAll()).thenReturn(allStudentsEmpty);
+        when(studentRepository.findAll()).thenReturn(new ArrayList<>());
 
         // Act
-        List<Student> studentsResult = studentService.getAllStudents();
+        List<StudentResponseDto> studentsResult = studentService.getAllStudents();
 
         // Assert
         assertTrue(studentsResult.isEmpty());
@@ -96,58 +109,65 @@ class StudentServiceTest {
     @Test
     void givenStudent_shouldCallSaveToCreateNewStudent() {
         // Arrange
+        when(studentRepository.findByEmail("test@example.com")).thenReturn(Optional.empty());
+        when(mapper.toEntity(studentRequestDto)).thenReturn(testStudent);
         when(studentRepository.save(any())).thenReturn(testStudent);
+        when(mapper.toResponse(testStudent)).thenReturn(studentResponseDto);
 
         // Act
-        Student result = studentService.createStudent(testStudent);
+        StudentResponseDto result = studentService.createStudent(studentRequestDto);
 
         // Assert
         assertNotNull(result);
+        assertEquals(studentResponseDto.email(), result.email());
         verify(studentRepository).save(testStudent);
     }
 
     @Test
     void givenExistingStudent_shouldThrowWhenEmailAlreadyExists() {
         // Arrange
+        when(mapper.toEntity(studentRequestDto)).thenReturn(testStudent);
         when(studentRepository.findByEmail(testStudent.getEmail())).thenReturn(Optional.of(testStudent));
 
         // Act / Assert
         assertThrows(Exception.class,
-                () -> studentService.createStudent(testStudent));
+                () -> studentService.createStudent(studentRequestDto));
     }
 
     @Test
     void updateStudent() {
         // Arrange
-        Student updatedStudent = new Student(testStudent.getFirstName(), testStudent.getLastName(), testStudent.getEmail(), 25);
-        Long id = 1L;
+        StudentRequestDto updatedStudentDto = new StudentRequestDto(testStudent.getFirstName(), testStudent.getLastName(), testStudent.getEmail(), 25);
+        Student updatedEntity = new Student(testStudent.getFirstName(), testStudent.getLastName(), testStudent.getEmail(), testStudent.getAge());
+        StudentResponseDto updatedStudentResponseDto = new StudentResponseDto(TEST_STUDENT_ID, testStudent.getFirstName(), testStudent.getLastName(), testStudent.getEmail(), testStudent.getAge());
 
-        when(studentRepository.findById(id)).thenReturn(Optional.of(testStudent));
-        when(studentRepository.save(testStudent)).thenReturn(updatedStudent);
+        when(studentRepository.findById(TEST_STUDENT_ID)).thenReturn(Optional.of(testStudent));
+        when(mapper.toEntity(updatedStudentDto)).thenReturn(updatedEntity);
+        when(studentRepository.save(testStudent)).thenReturn(updatedEntity);
+        when(mapper.toResponse(updatedEntity)).thenReturn(updatedStudentResponseDto);
 
         // Act
-        Student updatedAndSavedStudent = studentService.updateStudent(1L, updatedStudent);
+        StudentResponseDto updatedAndSavedStudentDto = studentService.updateStudent(TEST_STUDENT_ID, updatedStudentDto);
 
         // Assert
-        assertNotNull(updatedAndSavedStudent);
-        assertEquals(25, updatedAndSavedStudent.getAge());
-        verify(studentRepository).findById(id);
+        assertNotNull(updatedAndSavedStudentDto);
+        assertEquals(TEST_STUDENT_AGE, updatedAndSavedStudentDto.age());
+        verify(studentRepository).findById(TEST_STUDENT_ID);
         verify(studentRepository).save(testStudent);
     }
 
     @Test
-    void deleteStudent() {
+    void shouldDeleteStudent() {
         // Arrange
-        Long id = 1L;
-        when(studentRepository.findById(id)).thenReturn(Optional.of(testStudent));
-        doNothing().when(studentRepository).deleteById(id);
+        when(studentRepository.findById(TEST_STUDENT_ID)).thenReturn(Optional.of(testStudent));
+        doNothing().when(studentRepository).deleteById(TEST_STUDENT_ID);
 
         // Act
-        studentService.deleteStudent(id);
+        studentService.deleteStudent(TEST_STUDENT_ID);
 
         // Assert
-        verify(studentRepository).findById(id);
-        verify(studentRepository).deleteById(id);
+        verify(studentRepository).findById(TEST_STUDENT_ID);
+        verify(studentRepository).deleteById(TEST_STUDENT_ID);
     }
 
 }
