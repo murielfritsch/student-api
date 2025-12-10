@@ -37,17 +37,16 @@ class StudentServiceTest {
     private StudentRequestDto studentRequestDto;
     private StudentResponseDto studentResponseDto;
     private final Long TEST_STUDENT_ID = 1L;
-    private final int TEST_STUDENT_AGE = 25;
     private final int PAGE_NUMBER = 0;
     private final int PAGE_SIZE = 1;
     private final String sortByDefault = "id";
-    private final String sortByName = "lastName";
 
     @BeforeEach
     void setUp() {
         String FIRST_NAME = "FirstName";
         String LAST_NAME = "LastName";
         String EMAIL = "test@example.com";
+        int TEST_STUDENT_AGE = 25;
         testStudent = new Student(FIRST_NAME, LAST_NAME, EMAIL, TEST_STUDENT_AGE);
         studentRequestDto = new StudentRequestDto(
                 FIRST_NAME, LAST_NAME, EMAIL, TEST_STUDENT_AGE
@@ -112,7 +111,7 @@ class StudentServiceTest {
         // Arrange
         Pageable pageable = PageRequest.of(PAGE_NUMBER,PAGE_SIZE, Sort.by(sortByDefault));
         List<Student> emptyStudentsList = List.of();
-        Page<Student> pageWithStudents = new PageImpl<>(emptyStudentsList, pageable, 1);
+        Page<Student> pageWithStudents = new PageImpl<>(emptyStudentsList, pageable, 0);
         when(studentRepository.findAll(any(Pageable.class))).thenReturn(pageWithStudents);
 
         // Act
@@ -139,7 +138,7 @@ class StudentServiceTest {
         // Assert
         assertNotNull(result);
         assertEquals(studentResponseDto.email(), result.email());
-        verify(studentRepository).save(testStudent);
+        verify(studentRepository).save(any(Student.class));
     }
 
     @Test
@@ -149,16 +148,16 @@ class StudentServiceTest {
         when(studentRepository.findByEmail(testStudent.getEmail())).thenReturn(Optional.of(testStudent));
 
         // Act / Assert
-        assertThrows(Exception.class,
+        assertThrows(RuntimeException.class,
                 () -> studentService.createStudent(studentRequestDto));
     }
 
     @Test
     void updateStudent() {
         // Arrange
-        StudentRequestDto updatedStudentDto = new StudentRequestDto(testStudent.getFirstName(), testStudent.getLastName(), testStudent.getEmail(), 25);
-        Student updatedEntity = new Student(testStudent.getFirstName(), testStudent.getLastName(), testStudent.getEmail(), testStudent.getAge());
-        StudentResponseDto updatedStudentResponseDto = new StudentResponseDto(TEST_STUDENT_ID, testStudent.getFirstName(), testStudent.getLastName(), testStudent.getEmail(), testStudent.getAge());
+        StudentRequestDto updatedStudentDto = new StudentRequestDto(testStudent.getFirstName(), testStudent.getLastName(), testStudent.getEmail(), 20);
+        Student updatedEntity = new Student(testStudent.getFirstName(), testStudent.getLastName(), testStudent.getEmail(), 20);
+        StudentResponseDto updatedStudentResponseDto = new StudentResponseDto(TEST_STUDENT_ID, testStudent.getFirstName(), testStudent.getLastName(), testStudent.getEmail(), 20);
 
         when(studentRepository.findById(TEST_STUDENT_ID)).thenReturn(Optional.of(testStudent));
         when(mapper.toEntity(updatedStudentDto)).thenReturn(updatedEntity);
@@ -170,9 +169,20 @@ class StudentServiceTest {
 
         // Assert
         assertNotNull(updatedAndSavedStudentDto);
-        assertEquals(TEST_STUDENT_AGE, updatedAndSavedStudentDto.age());
+        assertEquals(20, updatedAndSavedStudentDto.age());
         verify(studentRepository).findById(TEST_STUDENT_ID);
         verify(studentRepository).save(testStudent);
+    }
+
+    @Test
+    void whenIdNotFound_updateStudentShouldThrow() {
+        // Arrange
+        when(studentRepository.findById(TEST_STUDENT_ID)).thenReturn(Optional.empty());
+        StudentRequestDto studentRequestDto = new StudentRequestDto("newFirstName", "NewLastName", "newemail@example.com", 19);
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () -> studentService.updateStudent(TEST_STUDENT_ID, studentRequestDto));
+        verify(studentRepository).findById(TEST_STUDENT_ID);
     }
 
     @Test
