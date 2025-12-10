@@ -1,5 +1,6 @@
 package com.example.studentapi.service;
 
+import com.example.studentapi.dto.PaginatedResponseDto;
 import com.example.studentapi.dto.StudentRequestDto;
 import com.example.studentapi.dto.StudentResponseDto;
 import com.example.studentapi.entity.Student;
@@ -11,8 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.*;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,33 +38,46 @@ class StudentServiceTest {
     private StudentResponseDto studentResponseDto;
     private final Long TEST_STUDENT_ID = 1L;
     private final int TEST_STUDENT_AGE = 25;
+    private final int PAGE_NUMBER = 0;
+    private final int PAGE_SIZE = 1;
+    private final String sortByDefault = "id";
+    private final String sortByName = "lastName";
 
     @BeforeEach
     void setUp() {
-        testStudent = new Student("FirstName", "LastName", "test@example.com", TEST_STUDENT_AGE);
+        String FIRST_NAME = "FirstName";
+        String LAST_NAME = "LastName";
+        String EMAIL = "test@example.com";
+        testStudent = new Student(FIRST_NAME, LAST_NAME, EMAIL, TEST_STUDENT_AGE);
         studentRequestDto = new StudentRequestDto(
-                "FirstName", "LastName", "test@example.com", TEST_STUDENT_AGE
+                FIRST_NAME, LAST_NAME, EMAIL, TEST_STUDENT_AGE
         );
-
         studentResponseDto = new StudentResponseDto(
-                TEST_STUDENT_ID, "FirstName", "LastName", "test@example.com", 20
+                TEST_STUDENT_ID, FIRST_NAME, LAST_NAME, EMAIL, 20
         );
     }
 
     @Test
-    void shouldCallFindAllStudents() {
+    void shouldCallFindAllStudentsAndReturnAllStudentsPaginated() {
         // Arrange
+        Pageable pageable = PageRequest.of(PAGE_NUMBER,PAGE_SIZE, Sort.by(sortByDefault));
         List<Student> allStudents = List.of(testStudent);
-        when(studentRepository.findAll()).thenReturn(allStudents);
+        Page<Student> pageWithStudents = new PageImpl<>(allStudents, pageable, 1);
+        when(studentRepository.findAll(pageable)).thenReturn(pageWithStudents);
         when(mapper.toResponse(testStudent)).thenReturn(studentResponseDto);
 
         // Act
-        List<StudentResponseDto> allStudentsResult = studentService.getAllStudents();
+        PaginatedResponseDto<StudentResponseDto> allStudentsPagedDtoResult = studentService.getAllStudents(PAGE_NUMBER,PAGE_SIZE, sortByDefault);
 
         // Assert
-        assertNotNull(allStudentsResult);
-        assertEquals(1, allStudentsResult.size());
-        verify(studentRepository).findAll();
+        assertNotNull(allStudentsPagedDtoResult);
+        assertEquals(allStudentsPagedDtoResult.size(), PAGE_SIZE);
+        assertEquals(allStudentsPagedDtoResult.currentPage(), PAGE_NUMBER);
+        assertEquals(1, allStudentsPagedDtoResult.totalPages());
+        assertEquals(1, allStudentsPagedDtoResult.totalItems());
+        assertEquals("", allStudentsPagedDtoResult.previousPageUrl());
+        assertEquals("", allStudentsPagedDtoResult.nextPageUrl());
+        verify(studentRepository).findAll(pageable);
         verify(mapper).toResponse(testStudent);
     }
 
@@ -96,19 +110,27 @@ class StudentServiceTest {
     @Test
     void givenNoStudents_whenGetAllStudents_shouldReturnEmptyList() {
         // Arrange
-        when(studentRepository.findAll()).thenReturn(new ArrayList<>());
+        Pageable pageable = PageRequest.of(PAGE_NUMBER,PAGE_SIZE, Sort.by(sortByDefault));
+        List<Student> emptyStudentsList = List.of();
+        Page<Student> pageWithStudents = new PageImpl<>(emptyStudentsList, pageable, 1);
+        when(studentRepository.findAll(any(Pageable.class))).thenReturn(pageWithStudents);
 
         // Act
-        List<StudentResponseDto> studentsResult = studentService.getAllStudents();
+        PaginatedResponseDto<StudentResponseDto> studentsPaginatedResponseDtoResult = studentService.getAllStudents(PAGE_NUMBER, PAGE_SIZE, sortByDefault);
 
         // Assert
-        assertTrue(studentsResult.isEmpty());
-        verify(studentRepository).findAll();
+        assertTrue(studentsPaginatedResponseDtoResult.items().isEmpty());
+        assertEquals(PAGE_NUMBER, studentsPaginatedResponseDtoResult.currentPage());
+        assertEquals(PAGE_SIZE, studentsPaginatedResponseDtoResult.size());
+        verify(studentRepository).findAll(pageable);
     }
 
     @Test
     void givenStudent_shouldCallSaveToCreateNewStudent() {
         // Arrange
+
+        System.out.println("testStudent - " + testStudent);
+
         when(studentRepository.findByEmail("test@example.com")).thenReturn(Optional.empty());
         when(mapper.toEntity(studentRequestDto)).thenReturn(testStudent);
         when(studentRepository.save(any())).thenReturn(testStudent);
