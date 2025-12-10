@@ -9,6 +9,7 @@ import com.example.studentapi.repository.StudentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -81,6 +82,29 @@ class StudentServiceTest {
     }
 
     @Test
+    void givenSortByField_shouldPassGivenField() {
+        // Arrange
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        when(mapper.toResponse(testStudent)).thenReturn(studentResponseDto);
+        when(studentRepository.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(testStudent)));
+
+        // Act
+        studentService.getAllStudents(0, 1, "lastName");
+
+        // Assert
+        verify(studentRepository).findAll(captor.capture());
+
+        Pageable passedPageable = captor.getValue();
+        Sort sort = passedPageable.getSort();
+
+        assertEquals(0, passedPageable.getPageNumber());
+        assertEquals(1, passedPageable.getPageSize());
+        assertEquals("lastName", sort.stream().iterator().next().getProperty());
+        assertEquals(Sort.Direction.ASC, sort.stream().iterator().next().getDirection());
+    }
+
+    @Test
     void givenId_shouldCallFindByIdAndReturnOneStudent() {
         // Arrange
         when(studentRepository.findById(TEST_STUDENT_ID)).thenReturn(Optional.of(testStudent));
@@ -144,12 +168,22 @@ class StudentServiceTest {
     @Test
     void givenExistingStudent_shouldThrowWhenEmailAlreadyExists() {
         // Arrange
-        when(mapper.toEntity(studentRequestDto)).thenReturn(testStudent);
         when(studentRepository.findByEmail(testStudent.getEmail())).thenReturn(Optional.of(testStudent));
 
         // Act / Assert
         assertThrows(RuntimeException.class,
                 () -> studentService.createStudent(studentRequestDto));
+    }
+
+    @Test
+    void createStudent_shouldCheckEmailBeforeMapping() {
+        when(studentRepository.findByEmail("test@example.com"))
+                .thenReturn(Optional.of(testStudent));
+
+        assertThrows(RuntimeException.class,
+                () -> studentService.createStudent(studentRequestDto));
+
+        verify(mapper, never()).toEntity(any());
     }
 
     @Test
@@ -164,14 +198,20 @@ class StudentServiceTest {
         when(studentRepository.save(testStudent)).thenReturn(updatedEntity);
         when(mapper.toResponse(updatedEntity)).thenReturn(updatedStudentResponseDto);
 
+        ArgumentCaptor<Student> captor = ArgumentCaptor.forClass(Student.class);
+
         // Act
         StudentResponseDto updatedAndSavedStudentDto = studentService.updateStudent(TEST_STUDENT_ID, updatedStudentDto);
+
 
         // Assert
         assertNotNull(updatedAndSavedStudentDto);
         assertEquals(20, updatedAndSavedStudentDto.age());
         verify(studentRepository).findById(TEST_STUDENT_ID);
-        verify(studentRepository).save(testStudent);
+        verify(studentRepository).save(captor.capture());
+//        verify(studentRepository).save(updatedEntity);
+        Student saved = captor.getValue();
+        assertEquals(20, saved.getAge());
     }
 
     @Test

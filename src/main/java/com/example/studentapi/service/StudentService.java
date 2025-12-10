@@ -50,20 +50,20 @@ public class StudentService {
     }
 
     public StudentResponseDto createStudent(StudentRequestDto studentDto) {
-        Student newStudent = mapper.toEntity(studentDto);
-
-        repository.findByEmail(newStudent.getEmail()).ifPresent(existingStudent -> {
+        repository.findByEmail(studentDto.email()).ifPresent(existingStudent -> {
             throw new RuntimeException("Email already taken");
         });
+        Student newStudent = mapper.toEntity(studentDto);
+
         Student createdStudent = repository.save(newStudent);
 
         return mapper.toResponse(createdStudent);
     }
 
     public StudentResponseDto updateStudent(Long id, StudentRequestDto updatedStudentDto) {
-        Student studentToUpdate = mapper.toEntity(updatedStudentDto);
-
         Student existingStudent = getStudentById(id);
+
+        Student studentToUpdate = mapper.toEntity(updatedStudentDto);
 
         existingStudent.setFirstName(studentToUpdate.getFirstName());
         existingStudent.setLastName(studentToUpdate.getLastName());
