@@ -128,9 +128,6 @@ class StudentServiceTest {
     @Test
     void givenStudent_shouldCallSaveToCreateNewStudent() {
         // Arrange
-
-        System.out.println("testStudent - " + testStudent);
-
         when(studentRepository.findByEmail("test@example.com")).thenReturn(Optional.empty());
         when(mapper.toEntity(studentRequestDto)).thenReturn(testStudent);
         when(studentRepository.save(any())).thenReturn(testStudent);
